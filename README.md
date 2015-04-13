@@ -50,8 +50,10 @@ export RCP={port}
 
 - interposes `src.get()` and `src.put()`, and also adds `src.flush()`
 
-- `src.get()` will go to src on the first call, and subsequently read only from redis,
+- `src.get()` will read from src on the first call, and subsequently read only from redis,
   unless the option `get({fromSource:true}, cb)` is used
 
-- `put()` will write directly to redis.
-   `cacheOpts.writeThru` means that `put()` will also write to otherSrc before returning
+- `src.put()` will write directly to redis.
+   `cacheOpts.writeThru` means that `put()` will also write to src before returning
+
+- `src.flush()` writes ALL files from cache back to source - it does not remember which ones were written.
