@@ -1,0 +1,26 @@
+{
+  "name": "pub-src-redis",
+  "version": "0.5.0",
+  "description": "redis source for pub-server and pub-generator - also provides cache for other sources",
+  "main": "pub-src-redis.js",
+  "dependencies": {
+    "redis": "*",
+    "debug": "*",
+    "pub-util": "*"
+  },
+  "devDependencies": {
+    "pub-src-fs": "*",
+    "mocha": "*",
+    "should": "*",
+    "deep-diff": "*"
+  },
+  "scripts": {
+    "test": "mocha --ui qunit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jldec/pub-src-redis.git"
+  },
+  "author": "jurgen leschner",
+  "license": "MIT"
+}
