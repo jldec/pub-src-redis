@@ -31,7 +31,7 @@ source.cache(otherSource, { writeThru:false });
 
 ```sh
 export RCA={auth-pass}
-export RCP={host}
+export RCH={host}
 export RCP={port}
 ```
 
@@ -47,7 +47,6 @@ export RCP={port}
 
 ### source.cache(src, [cacheOpts])
 
-
 - interposes `src.get()` and `src.put()`, and also adds `src.flush()`
 
 - `src.get()` will read from src on the first call, and subsequently read only from redis,
@@ -57,3 +56,12 @@ export RCP={port}
    `cacheOpts.writeThru` means that `put()` will also write to src before returning
 
 - `src.flush()` writes ALL files from cache back to source - it does not remember which ones were written.
+
+### source.clear(cb)
+- redis-specific api - used mainly for testing
+- deletes the key used by this src and everything in it - use with care
+
+### source.unref()
+- redis-specific api - e.g. used by `pub -O` 
+- allows the server to exit after creating an instance of src-redis
+- for more information, see [node_redis](https://github.com/mranney/node_redis#clientunref)

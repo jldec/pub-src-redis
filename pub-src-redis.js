@@ -35,11 +35,18 @@ module.exports = function sourceRedis(sourceOpts) {
     get: get,
     put: put,
     cache: cache,
-    clear: clear
+    clear: clear,
+    unref: unref
   };
 
   //--//--//--//--//--//--//--//--//--//--//
 
+  // call unref() to allow server to exit gracefully
+  function unref() {
+    if (redis) { redis.unref(); }
+  }
+
+  // connect is called automatically by other methods
   function connect() {
     if (!redis) {
       debug('createClient ' + key + ' at ' + host + ':' + port);
