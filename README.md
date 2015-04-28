@@ -62,6 +62,6 @@ export RCP={port}
 - deletes the key used by this src and everything in it - use with care
 
 ### source.unref()
-- redis-specific api - e.g. used by `pub -O` 
+- redis-specific api - e.g. used by `pub -O`
 - allows the server to exit after creating an instance of src-redis
 - for more information, see [node_redis](https://github.com/mranney/node_redis#clientunref)

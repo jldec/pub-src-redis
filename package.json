@@ -1,18 +1,18 @@
 {
   "name": "pub-src-redis",
-  "version": "0.5.1",
+  "version": "1.0.0",
   "description": "redis source for pub-server and pub-generator - also provides cache for other sources",
   "main": "pub-src-redis.js",
   "dependencies": {
-    "redis": "*",
-    "debug": "*",
-    "pub-util": "*"
+    "redis": "^0.12.1",
+    "debug": "^2.1.3",
+    "pub-util": "^1.0.0"
   },
   "devDependencies": {
-    "pub-src-fs": "*",
-    "mocha": "*",
-    "should": "*",
-    "deep-diff": "*"
+    "pub-src-fs": "^1.0.0",
+    "mocha": "^2.2.4",
+    "should": "^6.0.1",
+    "deep-diff": "^0.3.1"
   },
   "scripts": {
     "test": "mocha --ui qunit"
