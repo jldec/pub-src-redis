@@ -49,7 +49,7 @@ module.exports = function sourceRedis(sourceOpts) {
   // connect is called automatically by other methods
   function connect() {
     if (!redis) {
-      debug('createClient ' + key + ' at ' + host + ':' + port);
+      // debug('createClient ' + key + ' at ' + host + ':' + port);
       redis = redisLib.createClient(port, host, redisOpts); }
   }
 
@@ -142,6 +142,7 @@ module.exports = function sourceRedis(sourceOpts) {
     }
 
     // only provide a flush function if the cache is writable and not writeThru
+    // (existence of flush used by generator/update to force reload after save)
     if (cacheOpts.writable && !cacheOpts.writeThru) {
 
       // flush puts ALL files from cache back to source
