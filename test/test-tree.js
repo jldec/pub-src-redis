@@ -11,16 +11,16 @@ var u = require('pub-util');
 
 var expected =
 [ { path: '/-foo.txt', text: 'file some -->  ⌘ <---' },
-  { path: '/1/9.txt', text: '' },
   { path: '/1.txt', text: '' },
-  { path: '/2/10.txt/11.txt', text: '' },
-  { path: '/2/10.txt/12.txt', text: '' },
-  { path: '/2/10.txt/13/14.txt', text: '' },
-  { path: '/2/10.txt/13/level-4/not-ignored.txt', text: '' },
   { path: '/2.txt', text: '' },
   { path: '/3.txt', text: '' },
   { path: '/4.txt', text: '' },
   { path: '/5.txt', text: '' },
+  { path: '/1/9.txt', text: '' },
+  { path: '/2/10.txt/11.txt', text: '' },
+  { path: '/2/10.txt/12.txt', text: '' },
+  { path: '/2/10.txt/13/14.txt', text: '' },
+  { path: '/2/10.txt/13/level-4/not-ignored.txt', text: '' },
   { path: '/f1/6.txt', text: '' },
   { path: '/f1/7.txt', text: '' },
   { path: '/f2/8.txt', text: '' } ];
@@ -35,6 +35,7 @@ test('flush-put-get', function(done) {
 
     sourceFs.get(function(err, filesFs) {
       if (err) return done(err);
+// console.log(filesFs);
       assert.deepEqual(filesFs, expected);
 
       sourceRedis.put(filesFs.reverse(), null, function(err) {
@@ -42,6 +43,7 @@ test('flush-put-get', function(done) {
 
         sourceRedis.get(function(err, filesRedis) {
           if (err) return done(err);
+// console.log(filesRedis);
 
           assert.deepEqual(filesRedis, expected);
           sourceRedis.clear(done);

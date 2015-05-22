@@ -17,6 +17,8 @@ module.exports = function sourceRedis(sourceOpts) {
 
   sourceOpts = sourceOpts || {};
 
+  var sortEntry = sourceOpts.sortEntry || require('pub-src-fs/sort-entry')(sourceOpts);
+
   var redisOpts = typeof sourceOpts.src === 'object' ? u.omit(sourceOpts.src, 'pkg') : {};
 
   var host = redisOpts.host || process.env.RCH || 'localhost';
@@ -71,16 +73,13 @@ module.exports = function sourceRedis(sourceOpts) {
       if (err) return cb(err);
 
       // turn single hash object into properly sorted files array
-      // use hack to make path delimiter sort before everything else
-      var files = u.chain(data)
-        .map(function(text, path) {
-          return { path:path.replace(/\//g,'\t'), text:text };
-        })
-        .sortBy('path')
-        .each(function(file) {
-          file.path = file.path.replace(/\t/g,'/');
-        })
-        .value();
+      var files = u.map(data, function(text, path) {
+        return { path:path, text:text };
+      });
+
+      files = u.sortBy(files, function(entry) {
+        return sortEntry(entry.path);
+      });
 
       cb(null, files);
     });
