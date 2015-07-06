@@ -51,7 +51,7 @@ module.exports = function sourceRedis(sourceOpts) {
   // connect is called automatically by other methods
   function connect() {
     if (!redis) {
-      // debug('createClient ' + key + ' at ' + host + ':' + port);
+      debug('createClient ' + key + ' at ' + host + ':' + port);
       redis = redisLib.createClient(port, host, redisOpts); }
   }
 
