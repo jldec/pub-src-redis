@@ -1,13 +1,13 @@
 {
   "name": "pub-src-redis",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "redis source for pub-server and pub-generator - also provides cache for other sources",
   "main": "pub-src-redis.js",
   "dependencies": {
     "redis": "^0.12.1",
     "debug": "^2.1.3",
-    "pub-src-fs": "^1.2.0",
-    "pub-util": "^1.3.0"
+    "pub-src-fs": "^1.3.0",
+    "pub-util": "^1.4.0"
   },
   "devDependencies": {
     "mocha": "^2.2.4",
