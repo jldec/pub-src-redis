@@ -4,9 +4,8 @@
  *
 **/
 
-suite('pub-src-redis test-flush-put-get');
+var test = require('tape')
 
-var assert = require('assert')
 var u = require('pub-util');
 
 var expected =
@@ -25,28 +24,33 @@ var expected =
   { path: '/f1/7.txt', text: '' },
   { path: '/f2/8.txt', text: '' } ];
 
-test('flush-put-get', function(done) {
+test('flush-put-get', { timeout:500 }, function(t) {
 
   var sourceFs = require('pub-src-fs')( { path:__dirname + '/tree', glob:'**/*.txt', depth:5 } );
   var sourceRedis = require('..')( { path:'test', writable:1 } );
 
   sourceRedis.clear(function(err) {
-    if (err) return done(err);
+    t.error(err);
 
     sourceFs.get(function(err, filesFs) {
-      if (err) return done(err);
+      t.error(err);
+
 // console.log(filesFs);
-      assert.deepEqual(filesFs, expected);
+      t.deepEqual(filesFs, expected);
 
       sourceRedis.put(filesFs.reverse(), null, function(err) {
-        if (err) return done(err);
+        t.error(err);
 
         sourceRedis.get(function(err, filesRedis) {
-          if (err) return done(err);
+          t.error(err);
+
 // console.log(filesRedis);
 
-          assert.deepEqual(filesRedis, expected);
-          sourceRedis.clear(done);
+          t.deepEqual(filesRedis, expected);
+          sourceRedis.clear(function(err){
+            t.end(err);
+            sourceRedis.unref();
+          });
         });
       });
     });
@@ -54,34 +58,38 @@ test('flush-put-get', function(done) {
 });
 
 
-test('flush-put-put-etc.-get', function(done) {
+test('flush-put-put-etc.-get', { timeout:500 }, function(t) {
 
   var sourceFs = require('pub-src-fs')( { path:__dirname + '/tree', glob:'**/*.txt', depth:5 } );
   var sourceRedis = require('..')( { path:'test2', writable:1 } );
 
   sourceRedis.clear(function(err) {
-    if (err) return done(err);
+    t.error(err);
 
     sourceFs.get(function(err, filesFs) {
-      if (err) return done(err);
-      assert.deepEqual(filesFs, expected);
+      t.error(err);
+
+      t.deepEqual(filesFs, expected);
 
       var getAndTest = u.after(filesFs.length, function() {
         sourceRedis.get(function(err, filesRedis) {
-          if (err) return done(err);
+          t.error(err);
 
-          assert.deepEqual(filesRedis, expected);
-          sourceRedis.clear(done);
+          t.deepEqual(filesRedis, expected);
+          sourceRedis.clear(function(err){
+            t.end(err);
+            sourceRedis.unref();
+          });
         });
       })
 
       u.each(filesFs, function(file) {
         sourceRedis.put([file], null, function(err) {
-          if (err) return done(err);
+          t.error(err);
+
           getAndTest();
         });
       });
     });
   });
 });
-

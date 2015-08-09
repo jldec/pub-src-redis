@@ -4,9 +4,8 @@
  *
 **/
 
-suite('pub-src-redis test-sort');
+var test = require('tape')
 
-var assert = require('assert')
 var u = require('pub-util');
 
 var expected =
@@ -34,28 +33,34 @@ var expected =
   { path: '/ü12/file.md', text: '' },
   { path: '/zappa/alpha/booger.md', text: '' } ];
 
-test('compare sorted file lists', function(done) {
+test('compare sorted file lists', { timeout:500 }, function(t) {
+  t.plan(7);
 
   var sourceFs = require('pub-src-fs')( { path:__dirname + '/sortme', depth:5 } );
   var sourceRedis = require('..')( { path:'test', writable:1 } );
 
   sourceRedis.clear(function(err) {
-    if (err) return done(err);
+    t.error(err);
 
     sourceFs.get(function(err, filesFs) {
-      if (err) return done(err);
+      t.error(err);
+
 // console.log(filesFs);
-      assert.deepEqual(filesFs, expected);
+      t.deepEqual(filesFs, expected);
 
       sourceRedis.put(filesFs.reverse(), null, function(err) {
-        if (err) return done(err);
+        t.error(err);
 
         sourceRedis.get(function(err, filesRedis) {
-          if (err) return done(err);
+          t.error(err);
+
 // console.log(filesRedis);
 
-          assert.deepEqual(filesRedis, expected);
-          sourceRedis.clear(done);
+          t.deepEqual(filesRedis, expected);
+          sourceRedis.clear(function(err){
+            t.error(err);
+            sourceRedis.unref();
+          });
         });
       });
     });

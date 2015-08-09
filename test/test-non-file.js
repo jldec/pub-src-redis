@@ -4,10 +4,8 @@
  *
 **/
 
-suite('pub-src-redis test-non-file');
+var test = require('tape')
 
-var assert = require('assert')
-var deepdiff = require('deep-diff');
 var u = require('pub-util');
 
 var data = { string: 'hello ⌘',    // include some utf-8 multi-byte
@@ -17,30 +15,23 @@ var data = { string: 'hello ⌘',    // include some utf-8 multi-byte
              arr: [ 1, 2, 3, 'a', 'b', 'c' ] };
 
 
-test('put-get non-file data', function(done) {
+test('put-get non-file data', { timeout:500 }, function(t) {
+  t.plan(4);
 
   var sourceRedis = require('..')( { path:'test-non-file', type:'JSON', writable:1 } );
 
   sourceRedis.put(data, null, function(err) {
-    if (err) return done(err);
+    t.error(err);
 
     sourceRedis.get(function(err, redisData) {
-      if (err) return done(err);
+      t.error(err);
 
-      assertNoDiff(redisData, data, 'redis vs. data');
+      t.deepEqual(redisData, data, 'redis vs. data');
 
-      sourceRedis.clear(done);
+      sourceRedis.clear(function(err) {
+        t.error(err);
+        sourceRedis.unref();
+      });
     });
   });
 });
-
-
-function assertNoDiff(actual, expected, msg) {
-  var diff = deepdiff(actual, expected);
-  var maxdiff = 5;
-  if (diff) {
-    assert(false, 'deepDiff ' + (msg || '') + '\n'
-      + u.inspect(diff.slice(0,maxdiff), {depth:3})
-      + (diff.length > maxdiff ? '\n...(truncated)' : ''));
-  }
-}
