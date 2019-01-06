@@ -1,10 +1,10 @@
 /**
  * test-flush-put-get
- * copyright 2015, Jurgen Leschner - github.com/jldec - MIT license
+ * copyright 2015-2019, Jurgen Leschner - github.com/jldec - MIT license
  *
 **/
 
-var test = require('tape')
+var test = require('tape');
 
 var u = require('pub-util');
 
@@ -35,7 +35,7 @@ test('flush-put-get', { timeout:500 }, function(t) {
     sourceFs.get(function(err, filesFs) {
       t.error(err);
 
-// console.log(filesFs);
+      // console.log(filesFs);
       t.deepEqual(filesFs, expected);
 
       sourceRedis.put(filesFs.reverse(), null, function(err) {
@@ -44,7 +44,7 @@ test('flush-put-get', { timeout:500 }, function(t) {
         sourceRedis.get(function(err, filesRedis) {
           t.error(err);
 
-// console.log(filesRedis);
+          // console.log(filesRedis);
 
           t.deepEqual(filesRedis, expected);
           sourceRedis.clear(function(err){
@@ -54,7 +54,7 @@ test('flush-put-get', { timeout:500 }, function(t) {
         });
       });
     });
-  })
+  });
 });
 
 
@@ -81,7 +81,7 @@ test('flush-put-put-etc.-get', { timeout:500 }, function(t) {
             sourceRedis.unref();
           });
         });
-      })
+      });
 
       u.each(filesFs, function(file) {
         sourceRedis.put([file], null, function(err) {

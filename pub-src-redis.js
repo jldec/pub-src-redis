@@ -5,13 +5,12 @@
  * provides cache() and flush() to proxy another source
  *
  * TODO - make keys unique across pub-server instances
- * copyright 2015, Jurgen Leschner - github.com/jldec - MIT license
+ * copyright 2015-2019, Jurgen Leschner - github.com/jldec - MIT license
 **/
 
 var debug = require('debug')('pub:src-redis');
 
 var u = require('pub-util');
-var path = require('path');
 
 module.exports = function sourceRedis(sourceOpts) {
 
@@ -88,7 +87,6 @@ module.exports = function sourceRedis(sourceOpts) {
   function put(files, options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     if (!sourceOpts.writable) return cb(new Error('cannot write to non-writable source'));
-    debug('put ' + key);
     connect();
 
     if (type !== 'FILE') return redis.set(key, JSON.stringify(files), cb);
@@ -125,7 +123,7 @@ module.exports = function sourceRedis(sourceOpts) {
           });
         });
       });
-    }
+    };
 
     // interpose cachedPut on src.put
     src.put = function cachedPut(files, options, cb) {
@@ -138,7 +136,7 @@ module.exports = function sourceRedis(sourceOpts) {
         if (cacheOpts.writeThru) return srcPut(files, options, cb);
         return cb();
       });
-    }
+    };
 
     // only provide a flush function if the cache is writable and not writeThru
     // (existence of flush used by generator/update to force reload after save)
@@ -157,7 +155,7 @@ module.exports = function sourceRedis(sourceOpts) {
           }
           cb();
         });
-      }
+      };
 
     }
 
@@ -171,4 +169,4 @@ module.exports = function sourceRedis(sourceOpts) {
     redis.del(key, cb);
   }
 
-}
+};
