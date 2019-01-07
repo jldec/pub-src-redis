@@ -29,11 +29,11 @@ test('read write node-modules *.js', { timeout:5000 }, function(t) {
           t.equal(filesRedis.length, filesFs.length, 'pub-src-redis vs. pub-src-fs');
 
           u.each(filesFs, function(file, idx) {
-            t.equal(file.path, filesRedis[idx].path, file.path);
-            t.equal(u.size(file.text), u.size(filesRedis[idx].text), 'file size');
-            t.equal(file.text, filesRedis[idx].text, 'file data');
+            t.ok(file.path === filesRedis[idx].path &&
+                 u.size(file.text) === u.size(filesRedis[idx].text) &&
+                 file.text === filesRedis[idx].text,
+                 file.path);
           });
-
           sourceRedis.clear(function(err){
             t.error(err);
             sourceRedis.unref();
