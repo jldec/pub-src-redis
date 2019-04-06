@@ -1,18 +1,21 @@
 {
   "name": "pub-src-redis",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "redis source for pub-server and pub-generator - also provides cache for other sources",
   "main": "pub-src-redis.js",
   "dependencies": {
     "debug": "^4.1.1",
-    "pub-src-fs": "^2.0.3",
-    "pub-util": "^3.0.5",
+    "pub-src-fs": "^2.0.6",
+    "pub-util": "^3.0.6",
     "redis": "^2.8.0"
   },
   "devDependencies": {
-    "eslint": "^5.12.0",
-    "tape": "^4.9.2"
+    "eslint": "^5.16.0",
+    "tape": "^4.10.1"
   },
+  "files": [
+    "pub-src-redis.js"
+  ],
   "scripts": {
     "test": "tape test/*.js",
     "lint": "eslint ."
