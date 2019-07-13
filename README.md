@@ -1,4 +1,6 @@
 # pub-src-redis
+[![Azure Build Status](https://dev.azure.com/jldec/pub-src-redis/_apis/build/status/jldec.pub-src-redis?branchName=master)](https://dev.azure.com/jldec/pub-src-redis/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://api.travis-ci.org/jldec/pub-src-redis.svg?branch=master)](https://travis-ci.org/jldec/pub-src-redis)
 
 redis source for pub-server and pub-generator - also provides cache for other sources
 
