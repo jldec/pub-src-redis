@@ -5,7 +5,7 @@
  * provides cache() and flush() to proxy another source
  *
  * TODO - make keys unique across pub-server instances
- * copyright 2015-2019, Jurgen Leschner - github.com/jldec - MIT license
+ * copyright 2015-2020, Jürgen Leschner - github.com/jldec - MIT license
 **/
 
 var debug = require('debug')('pub:src-redis');
