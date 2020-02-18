@@ -10,6 +10,13 @@
       "name": "test-organic.js",
       "program": "${workspaceFolder}/test/test-organic.js",
       "cwd": "${workspaceRoot}"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "test-non-file.js",
+      "program": "${workspaceFolder}/test/test-non-file.js",
+      "cwd": "${workspaceRoot}"
     }
   ]
 }
