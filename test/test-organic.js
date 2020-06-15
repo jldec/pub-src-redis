@@ -20,7 +20,7 @@ test('read write node-modules *.js', { timeout:5000 }, function(t) {
     sourceFs.get(function(err, filesFs) {
       t.error(err);
 
-      sourceRedis.put(filesFs, null, function(err) {
+      sourceRedis.put(filesFs, function(err) {
         t.error(err);
 
         sourceRedis.get(function(err, filesRedis) {

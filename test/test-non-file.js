@@ -18,7 +18,7 @@ test('put-get non-file data', { timeout:2000 }, function(t) {
 
   var sourceRedis = require('..')( { path:'test-non-file', type:'JSON', writable:1 } );
 
-  sourceRedis.put(data, null, function(err) {
+  sourceRedis.put(data, function(err) {
     t.error(err);
 
     sourceRedis.get(function(err, redisData) {

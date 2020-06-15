@@ -56,6 +56,7 @@ module.exports = function sourceRedis(sourceOpts) {
       redis = redisLib.createClient(port, host, redisOpts); }
   }
 
+  // get all files, or if options.stage, get files with `stage` flag.
   function get(options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     connect();
@@ -75,10 +76,12 @@ module.exports = function sourceRedis(sourceOpts) {
 
       // turn single hash object into properly sorted files array
       try {
-        var files = u.map(data, function(json, path) {
+        var files = [];
+
+        u.each(data, function(json, path) {
           var data = JSON.parse(json);
-          var file = { path:path, text:data.text };
-          return file;
+          if (options.stage && !data.stage) return;
+          files.push({ path:path, text:data.text });
         });
 
         files = u.sortBy(files, function(entry) {
@@ -96,6 +99,7 @@ module.exports = function sourceRedis(sourceOpts) {
     });
   }
 
+  // put files - if options.stage, put with `stage` flag.
   function put(files, options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     if (!sourceOpts.writable) return cb(new Error('cannot write to non-writable source'));

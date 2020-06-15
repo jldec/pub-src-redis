@@ -46,7 +46,7 @@ test('compare sorted file lists', { timeout:500 }, function(t) {
       // console.log(filesFs);
       t.deepEqual(filesFs, expected);
 
-      sourceRedis.put(filesFs.reverse(), null, function(err) {
+      sourceRedis.put(filesFs.reverse(), function(err) {
         t.error(err);
 
         sourceRedis.get(function(err, filesRedis) {
