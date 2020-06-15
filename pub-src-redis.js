@@ -18,7 +18,7 @@ module.exports = function sourceRedis(sourceOpts) {
 
   var sortEntry = sourceOpts.sortEntry || require('pub-src-fs/sort-entry')(sourceOpts);
 
-  var redisOpts = typeof sourceOpts.src === 'object' ? u.omit(sourceOpts.src, 'pkg') : {};
+  var redisOpts = sourceOpts.redisOpts || {};
 
   var host = redisOpts.host || process.env.RCH || 'localhost';
   var port = redisOpts.port || process.env.RCP || 6379;
@@ -31,6 +31,8 @@ module.exports = function sourceRedis(sourceOpts) {
   var redis = null;
   var key = sourceOpts.name || sourceOpts.path || 'pub-src-redis-undefined';
   var type  = sourceOpts.type || 'FILE';
+
+  var cacheSrc = null;
 
   return {
     get: get,
@@ -72,13 +74,23 @@ module.exports = function sourceRedis(sourceOpts) {
       if (err) return cb(err);
 
       // turn single hash object into properly sorted files array
-      var files = u.map(data, function(text, path) {
-        return { path:path, text:text };
-      });
+      try {
+        var files = u.map(data, function(json, path) {
+          var data = JSON.parse(json);
+          var file = { path:path, text:data.text };
+          return file;
+        });
 
-      files = u.sortBy(files, function(entry) {
-        return sortEntry(entry.path);
-      });
+        files = u.sortBy(files, function(entry) {
+          return sortEntry(entry.path);
+        });
+      }
+      // handle JSON.parse errors by returning []
+      // e.g. invalid cache after upgrade
+      catch(err) {
+        console.log('pub-src-redis get', key, err);
+        files = [];
+      }
 
       cb(null, files);
     });
@@ -89,19 +101,28 @@ module.exports = function sourceRedis(sourceOpts) {
     if (!sourceOpts.writable) return cb(new Error('cannot write to non-writable source'));
     connect();
 
-    if (type !== 'FILE') return redis.set(key, JSON.stringify(files), cb);
+    if (type !== 'FILE') {
+      return redis.set(key, JSON.stringify(files), function(err) {
+        debug('put json', key, err || u.size(files) + ' bytes');
+        cb(err);
+      });
+    }
 
     var hash = {};
     u.each(files, function(file) {
-      hash[file.path] = file.text;
+      var data = { text:file.text };
+      if (options.stage) {
+        debug('stage file', key, file.path);
+        data.stage = 1;
+      }
+      hash[file.path] = JSON.stringify(data);
     });
     redis.hmset(key, hash, cb);
   }
 
   function cache(src, cacheOpts) {
     debug('cache init ' + key + (cacheOpts && cacheOpts.writeThru ? ' (writeThru)' : ''));
-    var srcGet = src.get;
-    var srcPut = src.put;
+    cacheSrc = u.assign({}, src);
 
     // interpose cachedGet on src.get
     src.get = function cachedGet(options, cb) {
@@ -112,8 +133,8 @@ module.exports = function sourceRedis(sourceOpts) {
           debug('cache hit ' + key);
           return cb(null, cachedFiles);
         }
-        debug((options.fromSource ? 'get from source ' : 'miss ') + key);
-        srcGet(options, function(err, srcFiles) {
+        debug((options.fromSource ? 'get from source ' : 'cache miss ') + key);
+        cacheSrc.get(options, function(err, srcFiles) {
           if (err) return cb(err);
 
           // TODO:check for collisions during get from source
@@ -130,10 +151,11 @@ module.exports = function sourceRedis(sourceOpts) {
       if (typeof options === 'function') { cb = options; options = {}; }
       if (!cacheOpts.writable) return cb(new Error('cannot write to non-writable source'));
       debug('cachedPut ' + key);
+      var putOpts = u.assign({}, options, cacheOpts.writeThru ? null : { stage:1 } );
 
-      put(files, options, function(err) {
+      put(files, putOpts, function(err) {
         if (err) return cb(err);
-        if (cacheOpts.writeThru) return srcPut(files, options, cb);
+        if (cacheOpts.writeThru) return cacheSrc.put(files, options, cb);
         return cb();
       });
     };
@@ -151,7 +173,7 @@ module.exports = function sourceRedis(sourceOpts) {
         get(options, function(err, cachedFiles) {
           if (err) return cb(err);
           if (cachedFiles && (type !== 'FILE' || cachedFiles.length)) {
-            return srcPut(cachedFiles, options, cb);
+            return cacheSrc.put(cachedFiles, options, cb);
           }
           cb();
         });
