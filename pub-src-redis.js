@@ -154,12 +154,13 @@ module.exports = function sourceRedis(sourceOpts) {
     src.put = function cachedPut(files, options, cb) {
       if (typeof options === 'function') { cb = options; options = {}; }
       if (!cacheOpts.writable) return cb(new Error('cannot write to non-writable source'));
-      debug('cachedPut ' + key);
-      var putOpts = u.assign({}, options, cacheOpts.writeThru ? null : { stage:1 } );
+      var writeThru = cacheOpts.writeThru || options.writeThru;
+      debug('cachedPut %s%s', key, writeThru ? ' (writeThru)' : '');
+      var putOpts = u.assign({}, options, writeThru ? null : { stage:1 } );
 
       put(files, putOpts, function(err) {
         if (err) return cb(err);
-        if (cacheOpts.writeThru) return cacheSrc.put(files, options, cb);
+        if (writeThru) return cacheSrc.put(files, options, cb);
         return cb();
       });
     };
@@ -168,12 +169,35 @@ module.exports = function sourceRedis(sourceOpts) {
     // (existence of flush used by generator/update to force reload after save)
     if (cacheOpts.writable && !cacheOpts.writeThru) {
 
-      // flush puts ALL files from cache back to source
-      // TODO: remember which files were written and only flush those
       src.flush = function flush(options, cb) {
         if (typeof options === 'function') { cb = options; options = {}; }
         debug('flush ' + key);
         connect();
+
+        // flush single file
+        if (type === 'FILE' && options.path) {
+          var path = options.path;
+          var file;
+          // TODO: extract single-file get()
+          redis.hget(key, options.path, function(err, data) {
+            debug('flush %s %s %s', key, path, err || u.size(data));
+            if (err) return cb(err);
+            try {
+              file = JSON.parse(data);
+              if (!file.stage) throw new Error('Cannot flush unstaged file');
+            }
+            catch(err) {
+              console.log('pub-src-redis flush', key, path, err);
+              cb(err);
+            }
+            // delegate to cached put without staging
+            src.put([ { path:path, text:file.text } ], { writeThru:1 } , cb);
+          });
+          return;
+        }
+
+        // flush ALL files from cache back to source
+        // TODO: if type === `FILE` only flush staged files
         get(options, function(err, cachedFiles) {
           if (err) return cb(err);
           if (cachedFiles && (type !== 'FILE' || cachedFiles.length)) {
@@ -182,7 +206,6 @@ module.exports = function sourceRedis(sourceOpts) {
           cb();
         });
       };
-
     }
 
   }
