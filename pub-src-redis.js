@@ -56,22 +56,46 @@ module.exports = function sourceRedis(sourceOpts) {
       redis = redisLib.createClient(port, host, redisOpts); }
   }
 
-  // get all files, or if options.stage, get files with `stage` flag.
+  // get one or all files, for all if options.stage only get files with `stage` flag.
   function get(options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     connect();
 
     if (type !== 'FILE') {
-      redis.get(key, function(err, s) {
-        debug('get %s %s bytes', key, err || u.size(s));
+      redis.get(key, function(err, data) {
+        debug('get JSON %s %s', key, err || u.size(data));
         if (err) return cb(err);
-        cb(null, JSON.parse(s));
+        try {
+          var file = JSON.parse(data);
+        }
+        catch(err) {
+          return cb(err);
+        }
+        cb(null, file);
       });
       return;
     }
 
+    // single-file get() - returns array just like multi-file
+    if (type === 'FILE' && options.path) {
+      var path = options.path;
+      redis.hget(key, options.path, function(err, data) {
+        debug('get file %s %s %s', key, path, err || u.size(data));
+        if (err) return cb(err);
+        try {
+          var file = JSON.parse(data);
+        }
+        catch(err) {
+          return cb(err);
+        }
+        cb(null, [ { path:path, text:file.text } ] );
+      });
+      return;
+    }
+
+    // get all files
     redis.hgetall(key, function(err, data) {
-      debug('get %s %s files', key, err || u.size(data));
+      debug('get files %s %s', key, err || u.size(data));
       if (err) return cb(err);
 
       // turn single hash object into properly sorted files array
@@ -79,9 +103,9 @@ module.exports = function sourceRedis(sourceOpts) {
         var files = [];
 
         u.each(data, function(json, path) {
-          var data = JSON.parse(json);
-          if (options.stage && !data.stage) return;
-          files.push({ path:path, text:data.text });
+          var file = JSON.parse(json);
+          if (options.stage && !file.stage) return;
+          files.push({ path:path, text:file.text });
         });
 
         files = u.sortBy(files, function(entry) {
@@ -165,46 +189,45 @@ module.exports = function sourceRedis(sourceOpts) {
       });
     };
 
-    // only provide a flush function if the cache is writable and not writeThru
+    // only provide flush and revert functions if the cache is writable and not writeThru
     // (existence of flush used by generator/update to force reload after save)
     if (cacheOpts.writable && !cacheOpts.writeThru) {
 
       src.flush = function flush(options, cb) {
         if (typeof options === 'function') { cb = options; options = {}; }
-        debug('flush ' + key);
         connect();
 
-        // flush single file
+        // flush single file (does not check if file is staged)
         if (type === 'FILE' && options.path) {
-          var path = options.path;
-          var file;
-          // TODO: extract single-file get()
-          redis.hget(key, options.path, function(err, data) {
-            debug('flush %s %s %s', key, path, err || u.size(data));
-            if (err) return cb(err);
-            try {
-              file = JSON.parse(data);
-              if (!file.stage) throw new Error('Cannot flush unstaged file');
-            }
-            catch(err) {
-              console.log('pub-src-redis flush', key, path, err);
-              cb(err);
-            }
-            // delegate to cached put without staging
-            src.put([ { path:path, text:file.text } ], { writeThru:1 } , cb);
+          get(options, function(err, files) {
+            debug('flush %s %s %s', key, options.path, err || u.size(files));
+            // put without staging, use writeThru
+            src.put(files, { writeThru:1 }, cb);
           });
           return;
         }
 
-        // flush ALL files from cache back to source
-        // TODO: if type === `FILE` only flush staged files
-        get(options, function(err, cachedFiles) {
-          if (err) return cb(err);
-          if (cachedFiles && (type !== 'FILE' || cachedFiles.length)) {
-            return cacheSrc.put(cachedFiles, options, cb);
-          }
-          cb();
-        });
+        process.nextTick(function() { cb(new Error('pub-src-redis only single-file flush is supported.')); });
+      };
+
+      src.revert = function revert(options, cb) {
+        if (typeof options === 'function') { cb = options; options = {}; }
+        connect();
+
+        // revert single file (does not check if file is staged)
+        if (type === 'FILE' && options.path) {
+          cacheSrc.get(options, function(err, files) {
+            debug('revert %s %s %s', key, options.path, err || u.size(files));
+            put(files, function(err) {
+              if (err) return cb(err);
+              // return reverted file data
+              return cb(null, files);
+            });
+          });
+          return;
+        }
+
+        process.nextTick(function() { cb(new Error('pub-src-redis only single-file revert is supported.')); });
       };
     }
 
