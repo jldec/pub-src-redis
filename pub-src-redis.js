@@ -77,11 +77,14 @@ module.exports = function sourceRedis(sourceOpts) {
     }
 
     // single-file get() - returns array just like multi-file
+    // unknown path results in error
     if (type === 'FILE' && options.path) {
       var path = options.path;
       redis.hget(key, options.path, function(err, data) {
-        debug('get file %s %s %s', key, path, err || u.size(data));
+        var ok = u.size(data);
+        debug('get file %s %s %s', key, path, err || ok);
         if (err) return cb(err);
+        if (!ok) return cb(new Error('pub-src-redis get unknown file: ' + path));
         try {
           var file = JSON.parse(data);
         }
@@ -175,6 +178,7 @@ module.exports = function sourceRedis(sourceOpts) {
     };
 
     // interpose cachedPut on src.put
+    // TODO: serialize to avoid concurrent put and revert
     src.put = function cachedPut(files, options, cb) {
       if (typeof options === 'function') { cb = options; options = {}; }
       if (!cacheOpts.writable) return cb(new Error('cannot write to non-writable source'));
@@ -201,6 +205,7 @@ module.exports = function sourceRedis(sourceOpts) {
         if (type === 'FILE' && options.path) {
           get(options, function(err, files) {
             debug('flush %s %s %s', key, options.path, err || u.size(files));
+            if (err) return cb(err);
             // put without staging, use writeThru
             src.put(files, { writeThru:1 }, cb);
           });
@@ -210,6 +215,7 @@ module.exports = function sourceRedis(sourceOpts) {
         process.nextTick(function() { cb(new Error('pub-src-redis only single-file flush is supported.')); });
       };
 
+      // TODO: serialize to avoid concurrent put and revert
       src.revert = function revert(options, cb) {
         if (typeof options === 'function') { cb = options; options = {}; }
         connect();
@@ -218,6 +224,7 @@ module.exports = function sourceRedis(sourceOpts) {
         if (type === 'FILE' && options.path) {
           cacheSrc.get(options, function(err, files) {
             debug('revert %s %s %s', key, options.path, err || u.size(files));
+            if (err) return cb(err);
             put(files, function(err) {
               if (err) return cb(err);
               // return reverted file data
