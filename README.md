@@ -1,5 +1,5 @@
 # pub-src-redis
-![CI](https://github.com/jldec/pub-src-redis/workflows/CI/badge.svg)
+[![CI](https://github.com/jldec/pub-src-redis/workflows/CI/badge.svg)](https://github.com/jldec/pub-src-redis/actions)
 
 redis source for pub-server and pub-generator - also provides cache for other sources
 
@@ -48,7 +48,7 @@ export RCP={port}
 
 ### source.cache(src, [cacheOpts])
 
-- interposes `src.get()` and `src.put()`, and also adds `src.flush()`
+- interposes `src.get()` and `src.put()`, for a different source (src) like github.
 
 - `src.get()` will read from src on the first call, and subsequently read only from redis,
   unless the option `get({fromSource:true}, cb)` is used
@@ -56,7 +56,9 @@ export RCP={port}
 - `src.put()` will write directly to redis.
    `cacheOpts.writeThru` means that `put()` will also write to src before returning
 
-- `src.flush()` writes ALL files from cache back to source - it does not remember which ones were written.
+- `src.commit()` writes a single file from cache back to source - only available if `!cacheOpts.writeThru`.
+
+- `src.revert()` reverts a single file from source - only available if `!cacheOpts.writeThru`.
 
 ### source.clear(cb)
 - redis-specific api - used mainly for testing

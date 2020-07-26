@@ -38,7 +38,7 @@ test('flush-put-get', { timeout:500 }, function(t) {
       // console.log(filesFs);
       t.deepEqual(filesFs, expected);
 
-      sourceRedis.put(filesFs.reverse(), null, function(err) {
+      sourceRedis.put(filesFs.reverse(), function(err) {
         t.error(err);
 
         sourceRedis.get(function(err, filesRedis) {
@@ -84,7 +84,7 @@ test('flush-put-put-etc.-get', { timeout:500 }, function(t) {
       });
 
       u.each(filesFs, function(file) {
-        sourceRedis.put([file], null, function(err) {
+        sourceRedis.put([file], function(err) {
           t.error(err);
 
           getAndTest();

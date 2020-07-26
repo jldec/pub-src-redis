@@ -2,7 +2,7 @@
  * pub-src-redis.js
  * pub-server file source using redis hash mapping path->text
  * supports non-FILE type (opaque) sources with simple key->data get/set
- * provides cache() and flush() to proxy another source
+ * provides cache() to proxy another source
  *
  * TODO - make keys unique across pub-server instances
  * copyright 2015-2020, Jürgen Leschner - github.com/jldec - MIT license
@@ -18,7 +18,7 @@ module.exports = function sourceRedis(sourceOpts) {
 
   var sortEntry = sourceOpts.sortEntry || require('pub-src-fs/sort-entry')(sourceOpts);
 
-  var redisOpts = typeof sourceOpts.src === 'object' ? u.omit(sourceOpts.src, 'pkg') : {};
+  var redisOpts = sourceOpts.redisOpts || {};
 
   var host = redisOpts.host || process.env.RCH || 'localhost';
   var port = redisOpts.port || process.env.RCP || 6379;
@@ -31,6 +31,8 @@ module.exports = function sourceRedis(sourceOpts) {
   var redis = null;
   var key = sourceOpts.name || sourceOpts.path || 'pub-src-redis-undefined';
   var type  = sourceOpts.type || 'FILE';
+
+  var cacheSrc = null;
 
   return {
     get: get,
@@ -54,69 +56,131 @@ module.exports = function sourceRedis(sourceOpts) {
       redis = redisLib.createClient(port, host, redisOpts); }
   }
 
+  // get one or all files, for all if options.stage only get files with `stage` flag.
   function get(options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     connect();
 
     if (type !== 'FILE') {
-      redis.get(key, function(err, s) {
-        debug('get %s %s bytes', key, err || u.size(s));
+      redis.get(key, function(err, data) {
+        debug('get JSON %s %s', key, err || u.size(data));
         if (err) return cb(err);
-        cb(null, JSON.parse(s));
+        try {
+          var file = JSON.parse(data);
+        }
+        catch(err) {
+          return cb(err);
+        }
+        cb(null, file);
       });
       return;
     }
 
+    // single-file get() - returns array just like multi-file
+    // unknown path results in error
+    if (type === 'FILE' && options.path) {
+      var path = options.path;
+      redis.hget(key, options.path, function(err, data) {
+        var ok = u.size(data);
+        debug('get file %s %s %s', key, path, err || ok);
+        if (err) return cb(err);
+        if (!ok) return cb(new Error('pub-src-redis get unknown file: ' + path));
+        try {
+          var file = JSON.parse(data);
+        }
+        catch(err) {
+          return cb(err);
+        }
+        cb(null, [ { path:path, text:file.text } ] );
+      });
+      return;
+    }
+
+    // get all files
     redis.hgetall(key, function(err, data) {
-      debug('get %s %s files', key, err || u.size(data));
+      debug('get files %s %s', key, err || u.size(data));
       if (err) return cb(err);
 
       // turn single hash object into properly sorted files array
-      var files = u.map(data, function(text, path) {
-        return { path:path, text:text };
-      });
+      try {
+        var files = [];
 
-      files = u.sortBy(files, function(entry) {
-        return sortEntry(entry.path);
-      });
+        u.each(data, function(json, path) {
+          var file = JSON.parse(json);
+          if (options.stage && !file.stage) return;
+          files.push({ path:path, text:file.text });
+        });
+
+        files = u.sortBy(files, function(entry) {
+          return sortEntry(entry.path);
+        });
+      }
+      // handle JSON.parse errors by returning []
+      // e.g. invalid cache after upgrade
+      catch(err) {
+        console.log('pub-src-redis get', key, err);
+        files = [];
+      }
 
       cb(null, files);
     });
   }
 
+  // put files - if options.stage || file.stage, put with `stage` flag.
   function put(files, options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     if (!sourceOpts.writable) return cb(new Error('cannot write to non-writable source'));
     connect();
 
-    if (type !== 'FILE') return redis.set(key, JSON.stringify(files), cb);
+    if (type !== 'FILE') {
+      return redis.set(key, JSON.stringify(files), function(err) {
+        debug('put json', key, err || u.size(files) + ' bytes');
+        cb(err);
+      });
+    }
 
     var hash = {};
     u.each(files, function(file) {
-      hash[file.path] = file.text;
+      var data = { text:file.text };
+      if (options.stage || file.stage) {
+        debug('stage file', key, file.path);
+        data.stage = 1;
+      }
+      hash[file.path] = JSON.stringify(data);
     });
     redis.hmset(key, hash, cb);
   }
 
   function cache(src, cacheOpts) {
     debug('cache init ' + key + (cacheOpts && cacheOpts.writeThru ? ' (writeThru)' : ''));
-    var srcGet = src.get;
-    var srcPut = src.put;
+    cacheSrc = u.assign({}, src);
 
     // interpose cachedGet on src.get
     src.get = function cachedGet(options, cb) {
       if (typeof options === 'function') { cb = options; options = {}; }
-      get(options, function(err, cachedFiles) {
+      // if fromSource, the results of cached get() are only used to keepStagedEdits
+      var getOpts = u.assign({}, options, options.fromSource ? { stage:1 } : null);
+      get(getOpts, function(err, cachedFiles) {
         if (err) return cb(err);
         if (!options.fromSource && cachedFiles && (type !== 'FILE' || cachedFiles.length)) {
           debug('cache hit ' + key);
           return cb(null, cachedFiles);
         }
-        debug((options.fromSource ? 'get from source ' : 'miss ') + key);
-        srcGet(options, function(err, srcFiles) {
+        // TODO: handle fromSource deletions
+        debug((options.fromSource ? 'get from source ' : 'cache miss ') + key);
+        cacheSrc.get(options, function(err, srcFiles) {
           if (err) return cb(err);
-
-          // TODO:check for collisions during get from source
+          if (cacheOpts.keepStagedEdits) {
+            var srcFile$ = u.indexBy(srcFiles, 'path');
+            u.each(cachedFiles, function(file) {
+              var srcFile = srcFile$[file.path];
+              if (srcFile && file.text !== srcFile.text) {
+                debug('keeping staged file', key, file.path);
+                srcFile.text = file.text;
+                srcFile.stage = 1;
+              }
+            });
+          }
           put(srcFiles, options, function(err) {
             if (err) return cb(err);
             cb(null, srcFiles);
@@ -126,37 +190,64 @@ module.exports = function sourceRedis(sourceOpts) {
     };
 
     // interpose cachedPut on src.put
+    // TODO: serialize to avoid concurrent put and revert
     src.put = function cachedPut(files, options, cb) {
       if (typeof options === 'function') { cb = options; options = {}; }
       if (!cacheOpts.writable) return cb(new Error('cannot write to non-writable source'));
-      debug('cachedPut ' + key);
+      var writeThru = cacheOpts.writeThru || options.writeThru;
+      debug('cachedPut %s%s', key, writeThru ? ' (writeThru)' : '');
+      var putOpts = u.assign({}, options, writeThru ? null : { stage:1 } );
 
-      put(files, options, function(err) {
+      put(files, putOpts, function(err) {
         if (err) return cb(err);
-        if (cacheOpts.writeThru) return srcPut(files, options, cb);
+        if (writeThru) return cacheSrc.put(files, options, cb);
         return cb();
       });
     };
 
-    // only provide a flush function if the cache is writable and not writeThru
-    // (existence of flush used by generator/update to force reload after save)
+    // only provide commit and revert functions if the cache is writable and not writeThru
+    // (existence of commit used by generator/update to force reload after save)
     if (cacheOpts.writable && !cacheOpts.writeThru) {
 
-      // flush puts ALL files from cache back to source
-      // TODO: remember which files were written and only flush those
-      src.flush = function flush(options, cb) {
+      src.commit = function commit(options, cb) {
         if (typeof options === 'function') { cb = options; options = {}; }
-        debug('flush ' + key);
         connect();
-        get(options, function(err, cachedFiles) {
-          if (err) return cb(err);
-          if (cachedFiles && (type !== 'FILE' || cachedFiles.length)) {
-            return srcPut(cachedFiles, options, cb);
-          }
-          cb();
-        });
+
+        // commit single file (does not check if file is staged)
+        if (type === 'FILE' && options.path) {
+          get(options, function(err, files) {
+            debug('commit %s %s %s', key, options.path, err || u.size(files));
+            if (err) return cb(err);
+            // put without staging, use writeThru
+            src.put(files, { writeThru:1 }, cb);
+          });
+          return;
+        }
+
+        process.nextTick(function() { cb(new Error('pub-src-redis only single-file commit is supported.')); });
       };
 
+      // TODO: serialize to avoid concurrent put and revert
+      src.revert = function revert(options, cb) {
+        if (typeof options === 'function') { cb = options; options = {}; }
+        connect();
+
+        // revert single file (does not check if file is staged)
+        if (type === 'FILE' && options.path) {
+          cacheSrc.get(options, function(err, files) {
+            debug('revert %s %s %s', key, options.path, err || u.size(files));
+            if (err) return cb(err);
+            put(files, function(err) {
+              if (err) return cb(err);
+              // return reverted file data
+              return cb(null, files);
+            });
+          });
+          return;
+        }
+
+        process.nextTick(function() { cb(new Error('pub-src-redis only single-file revert is supported.')); });
+      };
     }
 
   }
