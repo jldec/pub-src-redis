@@ -2,7 +2,7 @@
  * pub-src-redis.js
  * pub-server file source using redis hash mapping path->text
  * supports non-FILE type (opaque) sources with simple key->data get/set
- * provides cache() and flush() to proxy another source
+ * provides cache() to proxy another source
  *
  * TODO - make keys unique across pub-server instances
  * copyright 2015-2020, Jürgen Leschner - github.com/jldec - MIT license
@@ -126,7 +126,7 @@ module.exports = function sourceRedis(sourceOpts) {
     });
   }
 
-  // put files - if options.stage, put with `stage` flag.
+  // put files - if options.stage || file.stage, put with `stage` flag.
   function put(files, options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     if (!sourceOpts.writable) return cb(new Error('cannot write to non-writable source'));
@@ -142,7 +142,7 @@ module.exports = function sourceRedis(sourceOpts) {
     var hash = {};
     u.each(files, function(file) {
       var data = { text:file.text };
-      if (options.stage) {
+      if (options.stage || file.stage) {
         debug('stage file', key, file.path);
         data.stage = 1;
       }
@@ -158,17 +158,29 @@ module.exports = function sourceRedis(sourceOpts) {
     // interpose cachedGet on src.get
     src.get = function cachedGet(options, cb) {
       if (typeof options === 'function') { cb = options; options = {}; }
-      get(options, function(err, cachedFiles) {
+      // if fromSource, the results of cached get() are only used to keepStagedEdits
+      var getOpts = u.assign({}, options, options.fromSource ? { stage:1 } : null);
+      get(getOpts, function(err, cachedFiles) {
         if (err) return cb(err);
         if (!options.fromSource && cachedFiles && (type !== 'FILE' || cachedFiles.length)) {
           debug('cache hit ' + key);
           return cb(null, cachedFiles);
         }
+        // TODO: handle fromSource deletions
         debug((options.fromSource ? 'get from source ' : 'cache miss ') + key);
         cacheSrc.get(options, function(err, srcFiles) {
           if (err) return cb(err);
-
-          // TODO:check for collisions during get from source
+          if (cacheOpts.keepStagedEdits) {
+            var srcFile$ = u.indexBy(srcFiles, 'path');
+            u.each(cachedFiles, function(file) {
+              var srcFile = srcFile$[file.path];
+              if (srcFile && file.text !== srcFile.text) {
+                debug('keeping staged file', key, file.path);
+                srcFile.text = file.text;
+                srcFile.stage = 1;
+              }
+            });
+          }
           put(srcFiles, options, function(err) {
             if (err) return cb(err);
             cb(null, srcFiles);
@@ -193,18 +205,18 @@ module.exports = function sourceRedis(sourceOpts) {
       });
     };
 
-    // only provide flush and revert functions if the cache is writable and not writeThru
-    // (existence of flush used by generator/update to force reload after save)
+    // only provide commit and revert functions if the cache is writable and not writeThru
+    // (existence of commit used by generator/update to force reload after save)
     if (cacheOpts.writable && !cacheOpts.writeThru) {
 
-      src.flush = function flush(options, cb) {
+      src.commit = function commit(options, cb) {
         if (typeof options === 'function') { cb = options; options = {}; }
         connect();
 
-        // flush single file (does not check if file is staged)
+        // commit single file (does not check if file is staged)
         if (type === 'FILE' && options.path) {
           get(options, function(err, files) {
-            debug('flush %s %s %s', key, options.path, err || u.size(files));
+            debug('commit %s %s %s', key, options.path, err || u.size(files));
             if (err) return cb(err);
             // put without staging, use writeThru
             src.put(files, { writeThru:1 }, cb);
@@ -212,7 +224,7 @@ module.exports = function sourceRedis(sourceOpts) {
           return;
         }
 
-        process.nextTick(function() { cb(new Error('pub-src-redis only single-file flush is supported.')); });
+        process.nextTick(function() { cb(new Error('pub-src-redis only single-file commit is supported.')); });
       };
 
       // TODO: serialize to avoid concurrent put and revert
