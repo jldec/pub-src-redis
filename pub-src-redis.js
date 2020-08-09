@@ -18,7 +18,7 @@ module.exports = function sourceRedis(sourceOpts) {
 
   var sortEntry = sourceOpts.sortEntry || require('pub-src-fs/sort-entry')(sourceOpts);
 
-  var redisOpts = sourceOpts.redisOpts || {};
+  var redisOpts = u.assign({}, sourceOpts.redisOpts);
 
   var host = redisOpts.host || process.env.RCH || 'localhost';
   var port = redisOpts.port || process.env.RCP || 6379;
@@ -216,10 +216,11 @@ module.exports = function sourceRedis(sourceOpts) {
         // commit single file (does not check if file is staged)
         if (type === 'FILE' && options.path) {
           get(options, function(err, files) {
-            debug('commit %s %s %s', key, options.path, err || u.size(files));
+            var commitMsg = key + ' ' + (options.commitMsg || options.path);
+            debug('commit ' + commitMsg);
             if (err) return cb(err);
             // put without staging, use writeThru
-            src.put(files, { writeThru:1 }, cb);
+            src.put(files, { writeThru:1, commitMsg:commitMsg }, cb);
           });
           return;
         }
