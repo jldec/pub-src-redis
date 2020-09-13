@@ -134,7 +134,7 @@ module.exports = function sourceRedis(sourceOpts) {
 
     if (type !== 'FILE') {
       return redis.set(key, JSON.stringify(files), function(err) {
-        debug('put json', key, err || u.size(files) + ' bytes');
+        debug('put json', key, err || u.size(files) + ' entries');
         cb(err);
       });
     }
