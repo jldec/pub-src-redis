@@ -127,6 +127,7 @@ module.exports = function sourceRedis(sourceOpts) {
   }
 
   // put files - if options.stage || file.stage, put with `stage` flag.
+  // TODO: option to wipe old cache in same transaction as put
   function put(files, options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
     if (!sourceOpts.writable) return cb(new Error('cannot write to non-writable source'));
