@@ -1,6 +1,6 @@
 /**
  * pub-src-redis test-non-file
- * copyright 2015-2020, Jürgen Leschner - github.com/jldec - MIT license
+ * Copyright (c) 2015-2022 Jürgen Leschner - github.com/jldec - MIT license
  *
 **/
 
@@ -13,7 +13,7 @@ var data = { string: 'hello ⌘',    // include some utf-8 multi-byte
              arr: [ 1, 2, 3, 'a', 'b', 'c' ] };
 
 
-test('put-get non-file data', { timeout:2000 }, function(t) {
+test('put-get non-file data', { timeout:9999999 }, function(t) {
   t.plan(4);
 
   var sourceRedis = require('..')( { path:'test-non-file', type:'JSON', writable:1 } );

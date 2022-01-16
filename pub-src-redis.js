@@ -5,7 +5,7 @@
  * provides cache() to proxy another source
  *
  * TODO - make keys unique across pub-server instances
- * copyright 2015-2020, Jürgen Leschner - github.com/jldec - MIT license
+ * Copyright (c) 2015-2022 Jürgen Leschner - github.com/jldec - MIT license
 **/
 
 var debug = require('debug')('pub:src-redis');
@@ -53,7 +53,8 @@ module.exports = function sourceRedis(sourceOpts) {
   function connect() {
     if (!redis) {
       debug('createClient ' + key + ' at ' + host + ':' + port);
-      redis = redisLib.createClient(port, host, redisOpts); }
+      redis = redisLib.createClient(port, host, redisOpts);
+    }
   }
 
   // get one or all files, for all if options.stage only get files with `stage` flag.

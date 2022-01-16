@@ -1,13 +1,15 @@
 # pub-src-redis
 [![CI](https://github.com/jldec/pub-src-redis/workflows/CI/badge.svg)](https://github.com/jldec/pub-src-redis/actions)
 
-redis source for pub-server and pub-generator - also provides cache for other sources
+redis source for pub-server and pub-generator - also provides cache for other source
 
 * uses a redis hash to map file.path to file.text
 * supports non-FILE type (opaque) sources with simple key->data get and set
 * provides `get()` and `put()` for bulk reads and writes
 * also provides `cache()` to proxy-cache another source.
   This is useful for avoiding startup delays on slow/remote sources like github.
+
+NOTE: This library uses [node-redis](https://github.com/redis/node-redis) v3.x because of difficulties upgrading this codebase to v4.x.
 
 ## src(options)
 
