@@ -6,7 +6,7 @@ jobs:
   test:
     strategy:
       matrix:
-        node: [12, 14, 16, 17]
+        node: [18, 20, 22]
     # must use Linux for redis container
     runs-on: ubuntu-latest
 
@@ -18,8 +18,8 @@ jobs:
           - 6379:6379
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v1
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
     - run: npm install
