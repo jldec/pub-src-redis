@@ -7,6 +7,7 @@
  * TODO - make keys unique across pub-server instances
  * Copyright (c) 2015-2024 Jürgen Leschner - github.com/jldec - MIT license
 **/
+/* eslint indent: "off" */
 
 var debug = require('debug')('pub:src-redis');
 
@@ -18,12 +19,21 @@ module.exports = function sourceRedis(sourceOpts) {
 
   var sortEntry = sourceOpts.sortEntry || require('pub-src-fs/sort-entry')(sourceOpts);
 
-  var redisOpts = u.assign({}, sourceOpts.redisOpts);
+  // allow true or 1 but coerce opts to {} to use defaults
+  // NOTE: same logic in serve-sessions/serve-sessions.js
+  var redisOptions = u.assign({}, sourceOpts.redisOpts);
 
-  var host = redisOpts.host || process.env.RCH || 'localhost';
-  var port = redisOpts.port || process.env.RCP || 6379;
+  redisOptions.url = `redis${
+      redisOptions.rediss || process.env.RCS ? 's' : ''
+    }://default:${process.env.RCA || ''}@${
+      redisOptions.host || process.env.RCH || 'localhost'
+    }:${redisOptions.port || process.env.RCP || '6379'}`;
 
-  redisOpts.auth_pass = process.env.RCA || '';
+  delete redisOptions.host;
+  delete redisOptions.port;
+  delete redisOptions.rediss;
+  delete redisOptions.auth_pass; // ignored - must use env var
+  delete redisOptions.password;  // ignored - must use env var
 
   var redisLib = require('redis');
 
@@ -52,8 +62,8 @@ module.exports = function sourceRedis(sourceOpts) {
   // connect is called automatically by other methods
   function connect() {
     if (!redis) {
-      debug('createClient ' + key + ' at ' + host + ':' + port);
-      redis = redisLib.createClient(port, host, redisOpts);
+      redis = redisLib.createClient(redisOptions);
+      debug(`redis${redisOptions.rediss || process.env.RCS ? 's' : ''}`, redisOptions.host || process.env.RCH || 'localhost');
     }
   }
 
