@@ -1,6 +1,6 @@
 {
   "name": "pub-src-redis",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "redis source for pub-server and pub-generator - also provides cache for other sources",
   "main": "pub-src-redis.js",
   "dependencies": {

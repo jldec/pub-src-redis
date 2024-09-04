@@ -42,6 +42,9 @@ module.exports = function sourceRedis(sourceOpts) {
   var key = sourceOpts.name || sourceOpts.path || 'pub-src-redis-undefined';
   var type  = sourceOpts.type || 'FILE';
 
+  // for upstash which limits hgetall to ~1MB
+  var pageSize = sourceOpts.pageSize || 100;
+
   var cacheSrc = null;
 
   return {
@@ -108,7 +111,7 @@ module.exports = function sourceRedis(sourceOpts) {
     }
 
     // get all files
-    redis.hgetall(key, function(err, data) {
+    hgetall_paged(key, function(err, data) {
       debug('get files %s %s', key, err || u.size(data));
       if (err) return cb(err);
 
@@ -137,7 +140,43 @@ module.exports = function sourceRedis(sourceOpts) {
     });
   }
 
+  // NOTE: this operation is not atomic because of pagination.
+  function hgetall_paged(key, cb) {
+    redis.hkeys(key, function(err, keys) {
+      if (err) return cb(err);
+
+      var result = {};
+      var pages = Math.ceil(keys.length / pageSize);
+
+      // recursion is a clean way to deal with the callback chain
+      // thanks cursor
+      function getPage(pageIndex) {
+        if (pageIndex >= pages) {
+          return cb(null, result);
+        }
+
+        var start = pageIndex * pageSize;
+        var end = Math.min(start + pageSize, keys.length);
+        var pageKeys = keys.slice(start, end);
+
+        redis.hmget(key, pageKeys, function(err, values) {
+          debug('get files paged', key, err || pageKeys.length + '/' + keys.length);
+          if (err) return cb(err);
+
+          for (var i = 0; i < pageKeys.length; i++) {
+            result[pageKeys[i]] = values[i];
+          }
+
+          getPage(pageIndex + 1);
+        });
+      }
+
+      getPage(0);
+    });
+  }
+
   // put files - if options.stage || file.stage, put with `stage` flag.
+  // NOTE: this operation is not atomic because of pagination.
   // TODO: option to wipe old cache in same transaction as put
   function put(files, options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
@@ -151,16 +190,39 @@ module.exports = function sourceRedis(sourceOpts) {
       });
     }
 
-    var hash = {};
-    u.each(files, function(file) {
-      var data = { text:file.text };
-      if (options.stage || file.stage) {
-        debug('stage file', key, file.path);
-        data.stage = 1;
+    var totalFiles = files.length;
+    var processedFiles = 0;
+
+    // recursion is a clean way to deal with the callback chain
+    // thanks cursor
+    function processPage(startIndex) {
+      var hash = {};
+      var endIndex = Math.min(startIndex + pageSize, totalFiles);
+
+      for (var i = startIndex; i < endIndex; i++) {
+        var file = files[i];
+        var data = { text: file.text };
+        if (options.stage || file.stage) {
+          debug('stage file', key, file.path);
+          data.stage = 1;
+        }
+        hash[file.path] = JSON.stringify(data);
       }
-      hash[file.path] = JSON.stringify(data);
-    });
-    redis.hmset(key, hash, cb);
+
+      redis.hmset(key, hash, function(err) {
+        debug('put files paged', key, err || u.size(hash) + '/' + totalFiles);
+        if (err) return cb(err);
+        processedFiles += (endIndex - startIndex);
+
+        if (processedFiles < totalFiles) {
+          processPage(endIndex);
+        } else {
+          cb(null);
+        }
+      });
+    }
+
+    processPage(0);
   }
 
   function cache(src, cacheOpts) {
